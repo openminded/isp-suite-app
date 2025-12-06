@@ -1,90 +1,133 @@
 # Tech Stack Document
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+# Tech Stack Document for ISP-Care Pro
+
+This document explains, in everyday language, the technology choices behind ISP-Care Pro, our web-based platform for small to mid-sized retail businesses. It outlines how each piece fits together to deliver a secure, reliable, and user-friendly solution.
 
 ## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
 
-- **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+These are the tools and libraries that power everything you see and interact with in your browser or on your phone:
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+- **React**  
+  A popular JavaScript library for building interfaces. React lets us break the UI into reusable pieces (called components), making the app easy to maintain and extend.
+
+- **React Router**  
+  Manages page navigation in a single-page app. It ensures smooth transitions between Dashboard, Customer, Ticketing, and other sections without full page reloads.
+
+- **Progressive Web App (PWA)**  
+  Converts the web app into an installable experience on mobile devices. Users can add ISP-Care Pro to their home screen and get fast loading, even offline or on flaky networks.
+
+- **Leaflet.js + OpenStreetMap**  
+  Powers the interactive map view. Leaflet.js is a lightweight library for maps, and OpenStreetMap provides the base map data. Together, they let us plot customer locations, color-code statuses, and show pop-ups with quick actions.
+
+- **Styling and Layout**  
+  We use a simple CSS approach (CSS Modules or a similar scoped-CSS solution) for a clean, minimalistic look. This keeps styles organized, prevents conflicts, and matches our neutral color palette and easy-to-read fonts.
+
+- **State Management**  
+  React’s built-in Context API (or Redux for more complex cases) handles global data like user info, notifications, and real-time updates, ensuring all components stay in sync.
 
 ## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
 
-- **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+These components power the server side, manage data, and handle the business logic:
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+- **Node.js & Express.js**  
+  Node.js is a fast, JavaScript-based server platform. Express.js is a minimal framework on top of Node that helps us build RESTful APIs to serve data and handle requests from the frontend.
+
+- **PostgreSQL**  
+  A reliable relational database for structured data—users, roles, customers, tickets, and financial records. Its strong support for complex queries and data integrity makes it ideal for our needs.
+
+- **Sequelize ORM**  
+  An Object-Relational Mapping tool that simplifies database interactions. Instead of writing raw SQL, we use JavaScript methods to read and write data, reducing errors and speeding up development.
+
+- **JSON Web Tokens (JWT)**  
+  Manages secure login sessions. After a user logs in, the server issues a signed token that the frontend sends with each request to prove identity—no server-side session storage needed.
+
+- **Role-Based Access Control (RBAC)**  
+  Defines permissions for Super Admin, Admin, and Technician. Middleware checks each request against the user’s role, ensuring only authorized actions are allowed.
+
+- **MikroTik RouterOS REST API**  
+  Automates PPPoE secret creation, modification, rate limits, and status checks. Our backend talks to the router via its REST API whenever customer service plans change.
+
+- **Multi-Tenant Architecture**  
+  Each business operates in its own isolated environment (separate database schema). This keeps data from different clients completely separate for privacy and security.
 
 ## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
 
-- **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+How we host, update, and manage the overall system:
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+- **On-Premises Servers**  
+  All components run on servers you control, offering full control over data and network security.
+
+- **Git & GitLab (Self-Hosted)**  
+  Version control with Git keeps track of every code change. A self-hosted GitLab instance stores repositories and supports collaboration.
+
+- **CI/CD Pipelines (GitLab CI/CD)**  
+  Automated scripts that build, test, and deploy the app whenever new code is merged. This minimizes human error and speeds up releases.
+
+- **Docker Containerization**  
+  Packages each part of the system (frontend, backend, database) into isolated containers. This ensures consistency across development, testing, and production.
+
+- **Nginx Reverse Proxy & Load Balancer**  
+  Routes incoming web traffic to the right service and ensures HTTPS encryption. It can also distribute load across multiple backend instances if needed.
 
 ## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+These external services extend functionality without reinventing the wheel:
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+- **Xendit Payment Gateway**  
+  Handles subscription payments for Basic, Standard, and Premium plans. Xendit manages credit card processing, billing, and recurring payments securely.
+
+- **Telegram API**  
+  Sends real-time alerts and notifications (account activation, ticket updates) directly to a Telegram channel of your choice.
+
+- **CSV Import Functionality**  
+  Allows businesses to upload existing customer, ticket, or financial data via CSV files. The backend parses and imports these records into PostgreSQL.
+
+- **OpenStreetMap API**  
+  Provides map tiles and geocoding support for the interactive map view.
 
 ## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+Measures and optimizations to keep data safe and the app fast:
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
+- **Authentication & Data Protection**  
+  - Passwords hashed with bcrypt before storing in the database  
+  - JWT tokens signed with a strong secret and short expiration  
+  - HTTPS for all client-server communication
 
-These strategies work together to give users a fast, secure experience every time.
+- **Access Control & Auditing**  
+  - RBAC enforces permissions at the API level  
+  - Audit logs track who did what and when (user updates, ticket changes, report exports)
+
+- **Input Validation & Rate Limiting**  
+  - Server-side checks to prevent malformed or malicious data  
+  - Rate limiting on critical endpoints to guard against abuse
+
+- **Performance Optimizations**  
+  - Database indexing on frequently queried columns (e.g., customer status, ticket state)  
+  - Caching of static assets via PWA service worker  
+  - Code splitting and lazy loading in React to reduce initial page load size  
+  - Background jobs for non-urgent tasks (e.g., polling router status) to keep the API responsive
 
 ## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+ISP-Care Pro’s technology choices were made to balance reliability, scalability, and ease of use:
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+- A modern **React** frontend with **PWA** support ensures a smooth, app-like experience on any device.  
+- A **Node.js/Express** backend and **PostgreSQL** database provide a robust foundation for secure data management and RESTful APIs.  
+- **On-premises** deployment with **Docker**, **GitLab CI/CD**, and **Nginx** offers full control over hosting, rapid updates, and high availability.  
+- Integrations like **Xendit** and **Telegram** deliver seamless payments and real-time alerts without building these systems from scratch.  
+- Security measures (JWT, RBAC, auditing) and performance tweaks (caching, indexing) ensure data protection and a responsive user experience.
+
+Together, this stack aligns with our goal of delivering a user-friendly, secure, and scalable platform that helps small businesses streamline daily operations and gain actionable insights to grow their ISP services.
+
+
+---
+**Document Details**
+- **Project ID**: 5df15940-ecfb-4c61-a11c-4146dc32684e
+- **Document ID**: 9c83bc6a-53d9-4cdf-942c-1441fdcab9ca
+- **Type**: custom
+- **Custom Type**: tech_stack_document
+- **Status**: completed
+- **Generated On**: 2025-12-02T03:05:37.134Z
+- **Last Updated**: N/A

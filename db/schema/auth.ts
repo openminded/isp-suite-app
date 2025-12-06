@@ -1,4 +1,7 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { tenant } from "./tenant";
+
+export const userRoleEnum = pgEnum("user_role", ["super_admin", "admin", "technician"]);
 
 export const user = pgTable("user", {
     id: text("id").primaryKey(),
@@ -7,6 +10,10 @@ export const user = pgTable("user", {
     emailVerified: boolean("email_verified")
         .$defaultFn(() => false)
         .notNull(),
+    role: userRoleEnum("role").notNull().default("admin"),
+    tenantId: text("tenant_id")
+        .notNull()
+        .references(() => tenant.id, { onDelete: "cascade" }),
     image: text("image"),
     createdAt: timestamp("created_at")
         .$defaultFn(() => /* @__PURE__ */ new Date())

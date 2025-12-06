@@ -13,6 +13,24 @@ export const auth = betterAuth({
             verification: verification,
         }
     }),
+    user: {
+        additionalFields: {
+            role: {
+                type: "string",
+                required: true,
+                input: false,
+                defaultValue: "admin",
+                fieldName: "role",
+            },
+            tenantId: {
+                type: "string",
+                required: true,
+                input: false,
+                defaultValue: "default",
+                fieldName: "tenant_id",
+            },
+        },
+    },
     emailAndPassword: {
         enabled: true,
     },

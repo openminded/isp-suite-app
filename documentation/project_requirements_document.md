@@ -1,117 +1,254 @@
-# Project Requirements Document: codeguide-starter
+# Project Requirements Document
 
----
+# ISP-Care Pro: Project Requirements Document
 
 ## 1. Project Overview
 
-The **codeguide-starter** project is a boilerplate web application that provides a ready-made foundation for any web project requiring secure user authentication and a post-login dashboard. It sets up the common building blocks—sign-up and sign-in pages, API routes to handle registration and login, and a simple dashboard interface driven by static data. By delivering this skeleton, it accelerates development time and ensures best practices are in place from day one.
+ISP-Care Pro is a web-based SaaS platform designed to help small and mid-sized retail internet service providers (ISPs) streamline daily operations and make data-driven decisions. It brings together customer management, automated PPPoE provisioning, interactive geographic monitoring, support ticketing, financial tracking, and robust reporting—all under one roof. By automating routine tasks (like creating PPPoE accounts on MikroTik routers) and centralizing insights, ISP-Care Pro eliminates manual overhead, reduces errors, and frees up staff to focus on growth.
 
-This starter kit is being built to solve the friction developers face when setting up repeated common tasks: credential handling, session management, page routing, and theming. Key objectives include: 1) delivering a fully working authentication flow (registration & login), 2) providing a gated dashboard area upon successful login, 3) establishing a clear, maintainable project structure using Next.js and TypeScript, and 4) demonstrating a clean theming approach with global and section-specific CSS. Success is measured by having an end-to-end login journey in under 200 lines of code and zero runtime type errors.
+This platform is being built to address the fragmented toolsets most small ISPs currently juggle (spreadsheets for finances, separate ticketing systems, and manual router configurations). Key objectives are:
 
----
+*   Enable rapid customer onboarding with automated router integration.
+*   Provide clear, real-time visibility into network health and business KPIs.
+*   Simplify billing and expenses tracking with custom financial reports.
+*   Deliver a mobile-friendly experience (PWA) plus Telegram notifications.
+*   Ensure data isolation per business (multi-tenant) and strong security.
+
+Success criteria include reducing average ticket resolution time by 30%, cutting manual PPPoE setup steps by 90%, and achieving a 90% satisfaction rate among pilot customers.
 
 ## 2. In-Scope vs. Out-of-Scope
 
-### In-Scope (Version 1)
-- User registration (sign-up) form with validation
-- User login (sign-in) form with validation
-- Next.js API routes under `/api/auth/route.ts` handling:
-  - Credential validation
-  - Password hashing (e.g., bcrypt)
-  - Session creation or JWT issuance
-- Protected dashboard pages under `/dashboard`:
-  - `layout.tsx` wrapping dashboard content
-  - `page.tsx` rendering static data from `data.json`
-- Global application layout in `/app/layout.tsx`
-- Basic styling via `globals.css` and `dashboard/theme.css`
-- TypeScript strict mode enabled
+**In-Scope (Version 1.0)**
 
-### Out-of-Scope (Later Phases)
-- Integration with a real database (PostgreSQL, MongoDB, etc.)
-- Advanced authentication flows (password reset, email verification, MFA)
-- Role-based access control (RBAC)
-- Multi-tenant or white-label theming
-- Unit, integration, or end-to-end testing suites
-- CI/CD pipeline and production deployment scripts
+*   User authentication with JWT and role-based access control (Super Admin, Admin, Technician).
+*   User management interface (Super Admin level) and self-service profile updates.
+*   Customer CRUD and MikroTik RouterOS v7 REST API integration for PPPoE secret creation, modification, rate limits, and disabling.
+*   Background sync of PPPoE status and on-demand status refresh.
+*   Internet service plan (package) management.
+*   Interactive OpenStreetMap view with Leaflet.js, status-coded markers, pop-ups, filters, and technician-only views.
+*   Support ticketing module with ticket lifecycle, technician assignment, categorization, and performance KPIs.
+*   Financial management: custom income/expense categories, transaction logging, Profit & Loss and Cash Flow reports, CSV/PDF export.
+*   Executive dashboard showing top KPIs, detailed reports, and a custom report builder.
+*   CSV import for legacy customers, tickets, and financial data.
+*   Subscription tiers (Basic, Standard, Premium) and Xendit payment gateway integration.
+*   Telegram channel notifications for account events and ticket updates.
+*   Multi-tenant architecture with isolated PostgreSQL schemas/databases.
+*   Progressive Web App support and on-premises deployment.
 
----
+**Out-of-Scope (Phase 1)**
+
+*   Native mobile applications (iOS/Android).
+*   Integration with other router brands or protocols beyond MikroTik RouterOS v7.
+*   SMS or email notification channels (Telegram only).
+*   Advanced AI-driven predictive analytics.
+*   Third-party CRM or ERP integrations.
+*   White-labeling or custom branding per tenant.
 
 ## 3. User Flow
 
-A new visitor lands on the root URL and sees a welcome page with options to **Sign Up** or **Sign In**. If they choose Sign Up, they fill in their email, password, and hit “Create Account.” The form submits to `/api/auth/route.ts`, which hashes the password, creates a new user session or token, and redirects them to the dashboard. If any input is invalid, an inline error message explains the issue (e.g., “Password too short”).
+When a new business owner arrives on ISP-Care Pro, they click “Sign Up” and enter basic company details, contact info, and choose a subscription tier (Basic, Standard, or Premium). After submitting payment information via the embedded Xendit widget, they receive a Telegram message confirming activation and a secure link to set their password. Once they log in (JWT-backed), they land on the Executive Dashboard, where high-level metrics (Monthly Recurring Revenue, Churn Rate, Open Tickets) are displayed. A persistent left sidebar houses navigation links to Customers, Map, Tickets, Finances, Reports, and Settings.
 
-Once authenticated, the user is taken to the `/dashboard` route. Here they see a sidebar or header defined by `dashboard/layout.tsx`, and the main panel pulls in static data from `data.json`. They can log out (if that control is present), but otherwise their entire session is managed by server-side cookies or tokens. Returning users go directly to Sign In, submit credentials, and upon success they land back on `/dashboard`. Any unauthorized access to `/dashboard` redirects back to Sign In.
-
----
+Within Customers, they can add a new client by filling out a form; this action triggers REST calls to MikroTik to auto-provision PPPoE credentials. They see real-time status updates via a background sync process. Switching to the Map tab, they view color-coded markers for each customer and can filter by status or plan. Clicking a marker opens a pop-up to view details or create a ticket. In Tickets, admins assign issues to technicians, who access a dedicated view listing their open items. Finances let admins record transactions, view P&L and Cash Flow statements, and export CSV/PDF. Reports consolidate all data, and the custom builder lets users drag-and-drop metrics into charts. Super Admins head to Settings to manage users, roles, tenant parameters, CSV imports, and audit logs.
 
 ## 4. Core Features
 
-- **Sign-Up Page (`/app/sign-up/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Sign-In Page (`/app/sign-in/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Authentication API (`/app/api/auth/route.ts`)**: Handles both registration and login based on HTTP method, integrates password hashing (bcrypt) and session or JWT logic.
-- **Global Layout (`/app/layout.tsx` + `globals.css`)**: Shared header, footer, and CSS resets across all pages.
-- **Dashboard Layout (`/app/dashboard/layout.tsx` + `dashboard/theme.css`)**: Sidebar or top nav for authenticated flows, section-specific styling.
-- **Dashboard Page (`/app/dashboard/page.tsx`)**: Reads `data.json`, renders it as cards or tables.
-- **Static Data Source (`/app/dashboard/data.json`)**: Example dataset to demo dynamic rendering.
-- **TypeScript Configuration**: `tsconfig.json` with strict mode and path aliases (if any).
+*   **Authentication & RBAC**
 
----
+    *   JWT-based login/logout, token refresh, and session handling.
+    *   Predefined roles (Super Admin, Admin, Technician) with granular permissions.
+    *   User account creation, editing, deactivation (Super Admin only).
+    *   Self-service profile updates and password resets.
+
+*   **Customer & PPPoE Management**
+
+    *   Full CRUD for customer records.
+    *   MikroTik RouterOS v7 REST API integration for PPPoE secret create/update/disable and rate-limit settings.
+    *   Periodic polling to sync customer connection status.
+    *   Service plan (package) creation and assignment.
+
+*   **Geographic Customer Monitoring**
+
+    *   Leaflet.js map with OpenStreetMap tiles.
+    *   Color-coded status markers (Active, Inactive, Disabled).
+    *   Pop-ups showing customer name, plan, status, and quick actions.
+    *   Filters by status, plan, and search by name.
+    *   Technician-specific view showing only assigned customers.
+
+*   **Support Ticketing System**
+
+    *   Lifecycle tracking (Open → In Progress → Resolved → Closed).
+    *   Ticket categorization (e.g., No Connection, Slow Speed).
+    *   Admin assignment to technicians.
+    *   Technician Dashboard with individual KPIs (response time, resolution time).
+    *   Audit log of status changes and user actions.
+
+*   **Financial Management**
+
+    *   Dynamic income and expense categories.
+    *   Transaction logging interface.
+    *   Prebuilt Profit & Loss and Cash Flow reports.
+    *   Date/category filtering and CSV/PDF export.
+    *   Audit trail for exported reports.
+
+*   **Reporting & Analytics Hub**
+
+    *   Executive Dashboard with top-level KPIs.
+    *   In-depth, filterable module reports.
+    *   Custom Report Builder (drag-and-drop metrics, grouping, chart types).
+    *   Save, schedule, and export reports.
+
+*   **Billing & Subscription**
+
+    *   Three tiers: Basic, Standard, Premium.
+    *   Xendit payment gateway integration.
+    *   Tier-based feature gating.
+
+*   **Notifications & Alerting**
+
+    *   In-app notifications.
+    *   Telegram channel integration for critical events.
+
+*   **Data Import & Audit**
+
+    *   CSV upload for existing customers, tickets, finances.
+    *   Audit logs for all significant user actions.
 
 ## 5. Tech Stack & Tools
 
-- **Framework**: Next.js (App Router) for file-based routing, SSR/SSG, and API routes.
-- **Language**: TypeScript for type safety.
-- **UI Library**: React 18 for component-based UI.
-- **Styling**: Plain CSS via `globals.css` (global reset) and `theme.css` (sectional styling). Can easily migrate to CSS Modules or Tailwind in the future.
-- **Backend**: Node.js runtime provided by Next.js API routes.
-- **Password Hashing**: bcrypt (npm package).
-- **Session/JWT**: NextAuth.js or custom JWT logic (to be decided in implementation).
-- **IDE & Dev Tools**: VS Code with ESLint, Prettier extensions. Optionally, Cursor.ai for AI-assisted coding.
+*   **Frontend**
 
----
+    *   React (hooks, context API)
+    *   Progressive Web App (service workers)
+    *   Leaflet.js + OpenStreetMap
+    *   JWT handling in browser storage
+
+*   **Backend**
+
+    *   Node.js with Express
+    *   RESTful API endpoints
+    *   MikroTik RouterOS v7 REST API integration
+    *   Xendit payment API
+    *   Telegram Bot API for notifications
+
+*   **Database**
+
+    *   PostgreSQL (multi-tenant schemas or separate DB per tenant)
+
+*   **Authentication & Security**
+
+    *   JSON Web Tokens (JWT)
+    *   Role-Based Access Control (RBAC) middleware
+
+*   **DevOps & Hosting**
+
+    *   On-premises servers or private data center
+    *   Docker containers for services
+    *   CI/CD pipeline (GitHub Actions or Jenkins)
+
+*   **Data Import/Export**
+
+    *   CSV parser library (e.g., csv-parse)
+    *   PDF and CSV generation tools (e.g., pdfkit, fast-csv)
+
+*   **IDE & Integrations**
+
+    *   VS Code with ESLint, Prettier, and Docker extensions
 
 ## 6. Non-Functional Requirements
 
-- **Performance**: Initial page load under 200 ms on a standard broadband connection. API responses under 300 ms.
-- **Security**:
-  - HTTPS only in production.
-  - Proper CORS, CSRF protection for API routes.
-  - Secure password storage (bcrypt with salt).
-  - No credentials or secrets checked into version control.
-- **Scalability**: Structure must support adding database integration, caching layers, and advanced auth flows without rewiring core app.
-- **Usability**: Forms should give real-time feedback on invalid input. Layout must be responsive (mobile > 320 px).
-- **Maintainability**: Code must adhere to TypeScript strict mode. Linting & formatting enforced by ESLint/Prettier.
+*   **Performance**
 
----
+    *   API response time ≤ 200 ms for standard queries.
+    *   Dashboard initial load ≤ 2 s on 4G network.
+
+*   **Scalability**
+
+    *   Support up to 1,000 concurrent users per tenant.
+    *   Multi-tenant sharding strategy as customer base grows.
+
+*   **Security & Compliance**
+
+    *   TLS encryption for all traffic.
+    *   Encrypted JWT secrets and environment variables.
+    *   Audit log retention policy (e.g., 90 days).
+    *   GDPR-style data isolation per tenant.
+
+*   **Usability**
+
+    *   Mobile-first responsive design (PWA).
+    *   WCAG AA accessibility for forms and dashboards.
+
+*   **Reliability & Availability**
+
+    *   99.9% uptime SLA.
+    *   Automated health checks and alerts.
 
 ## 7. Constraints & Assumptions
 
-- **No Database**: Dashboard uses only `data.json`; real database integration is deferred.
-- **Node Version**: Requires Node.js >= 14.
-- **Next.js Version**: Built on Next.js 13+ App Router.
-- **Authentication**: Assumes availability of bcrypt or NextAuth.js at implementation time.
-- **Hosting**: Targets serverless or Node.js-capable hosting (e.g., Vercel, Netlify).
-- **Browser Support**: Modern evergreen browsers; no IE11 support required.
+*   **On-Premises Hosting**
 
----
+    *   All services run within the client's data center or private cloud.
+    *   Network access rules must allow RouterOS API calls and Telegram API connections.
+
+*   **MikroTik Availability**
+
+    *   MikroTik RouterOS v7’s REST API must be enabled and reachable.
+
+*   **Multi-Tenant Architecture**
+
+    *   Assumes PostgreSQL can handle schema isolation or multiple databases per tenant.
+    *   Tenant onboarding scripts will provision database schemas.
+
+*   **CSV Imports**
+
+    *   Incoming CSV files follow agreed column formats.
+    *   Large imports may be rate-limited to avoid DB contention.
+
+*   **Telegram Notifications**
+
+    *   Users must have Telegram accounts and join the designated channel.
 
 ## 8. Known Issues & Potential Pitfalls
 
-- **Static Data Limitation**: `data.json` is only for demo. A real API or database will be needed to avoid stale data.
-  *Mitigation*: Define a clear interface for data fetching so swapping to a live endpoint is trivial.
+*   **RouterOS Rate Limits**
 
-- **Global CSS Conflicts**: Using global styles can lead to unintended overrides.
-  *Mitigation*: Plan to migrate to CSS Modules or utility-first CSS in Phase 2.
+    *   Rapid provisioning calls could hit MikroTik API rate limits.
+    *   Mitigation: introduce request queuing and exponential back-off.
 
-- **API Route Ambiguity**: Single `/api/auth/route.ts` handling both sign-up and sign-in could get complex.
-  *Mitigation*: Clearly branch on HTTP method (`POST /register` vs. `POST /login`) or split into separate files.
+*   **Data Sync Lags**
 
-- **Lack of Testing**: No test suite means regressions can slip in.
-  *Mitigation*: Build a minimal Jest + React Testing Library setup in an early iteration.
+    *   Background polling for PPPoE status might lag during network outages.
+    *   Mitigation: implement stale-data indicators and retry logic.
 
-- **Error Handling Gaps**: Client and server must handle edge cases (network failures, malformed input).
-  *Mitigation*: Define a standard error response schema and show user-friendly messages.
+*   **CSV Format Variability**
+
+    *   Users may upload malformed CSVs.
+    *   Mitigation: build strict schema validation with clear error messages.
+
+*   **Multi-Tenant Resource Contention**
+
+    *   Performance may degrade if one tenant runs heavy reports.
+    *   Mitigation: use query quotas or schedule heavy jobs off-peak.
+
+*   **PWA Browser Compatibility**
+
+    *   Older browsers may not fully support service workers.
+    *   Mitigation: detect support and fall back to standard web behavior.
+
+*   **On-Premises Network Configuration**
+
+    *   Firewalls or proxies may block outbound calls to Telegram or Xendit.
+    *   Mitigation: provide network configuration guidelines and fallbacks.
+
+This document serves as the single source of truth for ISP-Care Pro’s Version 1.0. Subsequent technical specifications (Tech Stack Document, Frontend Guidelines, Backend Structure, Flowcharts, Security Guidelines) can be generated directly from these requirements without further clarifications.
+
 
 ---
-
-This PRD should serve as the single source of truth for the AI model or any developer generating the next set of technical documents: Tech Stack Doc, Frontend Guidelines, Backend Structure, App Flow, File Structure, and IDE Rules. It contains all functional and non-functional requirements with no ambiguity, enabling seamless downstream development.
+**Document Details**
+- **Project ID**: 5df15940-ecfb-4c61-a11c-4146dc32684e
+- **Document ID**: bb9a320f-5efc-4da6-81f0-f761669b3e0b
+- **Type**: custom
+- **Custom Type**: project_requirements_document
+- **Status**: completed
+- **Generated On**: 2025-12-02T03:03:33.607Z
+- **Last Updated**: 2025-12-06T14:34:36.801Z

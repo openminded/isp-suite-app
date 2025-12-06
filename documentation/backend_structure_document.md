@@ -1,179 +1,326 @@
 # Backend Structure Document
 
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
+# Backend Structure Document
+
+This document outlines the backend architecture, hosting setup, and infrastructure components for **ISP-Care Pro**. It’s written in everyday language so anyone can understand how the backend works.
 
 ## 1. Backend Architecture
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+We chose a modular, layered approach using Node.js and Express. This keeps code organized and easy to maintain:
 
+- **Framework & Patterns**
+  - Node.js with Express for handling HTTP requests
+  - MVC (Model-View-Controller) style: controllers manage routes, services hold business logic, repositories talk to the database
+  - Separate modules (Auth, Customers, Tickets, Finance, Reports, Notifications) so new features plug right in
 - **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
-
+  - Docker containers for each module, so we can spin up more instances when traffic grows
+  - Stateless design: all user data and sessions live in PostgreSQL or Redis, not in memory
 - **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
-
+  - Clear folder structure: `/controllers`, `/services`, `/repositories`, `/models`, `/routes`
+  - Environment variables for configuration (no hard-coded values)
+  - Automated tests split into unit and integration tests
 - **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+  - Caching of frequently requested data (e.g., service plans, tenant settings) in Redis
+  - Asynchronous tasks (MikroTik polling, Telegram notifications) handled by a job queue
 
 ## 2. Database Management
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+We use PostgreSQL, a trusted relational database, with one database per cluster and row-level isolation for tenants.
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
-
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+- **Type & System**
+  - SQL database: PostgreSQL
+- **Multi-Tenancy**
+  - Each record has a `tenant_id` column to keep data separate
+  - Shared database, single schema
+- **Data Structure & Access**
+  - Tables for users, roles, tenants, customers, PPPoE secrets, tickets, transactions, audit logs, subscriptions, etc.
+  - Indexes on key columns (`tenant_id`, `user_id`, `created_at`) to speed up queries
+- **Data Management**
+  - Daily backups (dump + WAL) to local backup server
+  - Migrations handled with a tool like `knex` or `sequelize` CLI
+  - CSV import endpoint that parses files in the backend and inserts data in batches
 
 ## 3. Database Schema
 
-### Human-Readable Format
+### Human-Readable Overview
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
-
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
-
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
+- Tenants: businesses using the platform
+- Users: Super Admin, Admin, Technician with roles and permissions
+- Roles: maps to permission sets
+- Customers: ISP customers, with address and geo-coordinates
+- Service Plans: defines bandwidth and pricing
+- PPPoE Secrets: records on MikroTik for each customer
+- Tickets: support case lifecycle
+- Transactions: income and expense entries
+- Subscriptions: tracks subscription tier and billing period
+- Audit Logs: who did what and when
 
 ### SQL Schema (PostgreSQL)
+
 ```sql
--- Users table
+-- Tenants
+CREATE TABLE tenants (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  domain VARCHAR(100) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Roles
+CREATE TABLE roles (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Users
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  role_id INT REFERENCES roles(id),
+  email VARCHAR(150) UNIQUE NOT NULL,
+  password_hash VARCHAR(200) NOT NULL,
+  full_name VARCHAR(100),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Sessions table
-CREATE TABLE sessions (
+-- Service Plans
+CREATE TABLE service_plans (
   id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  bandwidth INT NOT NULL,    -- in Mbps
+  price NUMERIC(10,2) NOT NULL,
+  description TEXT
 );
 
--- Dashboard items table
-CREATE TABLE dashboard_items (
+-- Customers
+CREATE TABLE customers (
   id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  address TEXT,
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
+  plan_id INT REFERENCES service_plans(id),
+  status VARCHAR(20) DEFAULT 'inactive',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- PPPoE Secrets
+CREATE TABLE pppoe_secrets (
+  id SERIAL PRIMARY KEY,
+  customer_id INT REFERENCES customers(id) ON DELETE CASCADE,
+  mikrotik_id VARCHAR(50),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password VARCHAR(100) NOT NULL,
+  rate_limit VARCHAR(50),
+  status VARCHAR(20) DEFAULT 'disabled',
+  updated_at TIMESTAMP
+);
+
+-- Tickets
+CREATE TABLE tickets (
+  id SERIAL PRIMARY KEY,
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id INT REFERENCES customers(id),
+  created_by INT REFERENCES users(id),
+  assigned_to INT REFERENCES users(id),
+  category VARCHAR(50),
+  status VARCHAR(20) DEFAULT 'open',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
+);
+
+-- Transactions
+CREATE TABLE transactions (
+  id SERIAL PRIMARY KEY,
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  type VARCHAR(10) CHECK (type IN ('income','expense')),
+  category VARCHAR(50),
+  amount NUMERIC(12,2) NOT NULL,
+  transaction_date DATE NOT NULL,
+  description TEXT,
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Subscriptions
+CREATE TABLE subscriptions (
+  id SERIAL PRIMARY KEY,
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  tier VARCHAR(20) CHECK (tier IN ('Basic','Standard','Premium')),
+  start_date DATE,
+  end_date DATE,
+  status VARCHAR(20)
+);
+
+-- Audit Logs
+CREATE TABLE audit_logs (
+  id SERIAL PRIMARY KEY,
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id),
+  action VARCHAR(100),
+  entity VARCHAR(50),
+  entity_id INT,
+  changes JSONB,
+  timestamp TIMESTAMP DEFAULT NOW()
 );
 ```  
 
 ## 4. API Design and Endpoints
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+We use RESTful endpoints with clear URL patterns. JSON is the data exchange format.
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+### Authentication & User Management
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+- POST `/api/auth/login` – user login, returns JWT pair (access + refresh)
+- POST `/api/auth/refresh` – refresh access token
+- POST `/api/auth/logout` – invalidate refresh token
+- GET `/api/users` – list users (Super Admin only)
+- POST `/api/users` – create user
+- PATCH `/api/users/:id` – edit user (roles, status)
+- DELETE `/api/users/:id` – deactivate user
+
+### Customer & PPPoE
+
+- GET `/api/customers` – list customers (with filters)
+- POST `/api/customers` – add customer
+- GET `/api/customers/:id` – get details
+- PATCH `/api/customers/:id` – update customer
+- DELETE `/api/customers/:id` – remove customer
+- POST `/api/customers/:id/pppoe` – create/modify PPPoE
+- PATCH `/api/customers/:id/pppoe/status` – enable/disable secret
+- GET `/api/customers/:id/status` – real-time connection status
+
+### Geographic Monitoring
+
+- GET `/api/customers/geo` – returns geo-coordinates and status for map markers
+
+### Support Ticketing
+
+- GET `/api/tickets` – list tickets
+- POST `/api/tickets` – open a ticket
+- PATCH `/api/tickets/:id` – update status or assign technician
+- GET `/api/tickets/:id` – ticket details
+
+### Financial Management
+
+- GET `/api/transactions` – list income/expenses
+- POST `/api/transactions` – add transaction
+- GET `/api/reports/financial` – profit & loss, cash flow
+
+### Reporting & Analytics
+
+- GET `/api/reports/executive` – top‐level KPIs
+- GET `/api/reports/:module` – module‐specific reports
+- POST `/api/reports/custom` – generate custom report
+
+### Integrations & Utilities
+
+- POST `/api/import/csv` – upload CSV for bulk import
+- POST `/api/webhooks/xendit` – handle payment events
+- POST `/api/webhooks/mikrotik` – handle router events (optional)
+- POST `/api/notifications/telegram` – send Telegram alerts
+- GET `/api/audit/logs` – view audit trail (Super Admin)
 
 ## 5. Hosting Solutions
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
+We’re hosting entirely on-premises to meet data-control requirements:
 
+- **Containerization**
+  - Docker for app services and worker queues
+  - Docker Compose or Kubernetes (if the environment supports it)
+- **Load Balancing**
+  - Nginx or HAProxy as reverse proxy and load balancer
+- **Database Server**
+  - Dedicated PostgreSQL server with replication standby for failover
+- **Storage**
+  - Network-attached storage (NAS) for backups and uploaded files
 - **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+  - Full control over hardware and data
+  - Predictable costs (no cloud bills)
+  - Compliance with strict security policies
 
 ## 6. Infrastructure Components
 
 - **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
-
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
-
+  - Distributes HTTP traffic across multiple Node.js instances
 - **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
-
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
-
+  - Redis for:
+    - JWT blacklisting
+    - PPPoE status caching
+    - Rate limiting counters
 - **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+  - Redis Queue or RabbitMQ for background jobs:
+    - Polling MikroTik router statuses
+    - Sending Telegram notifications
+    - Generating reports
+- **Content Delivery / Static Assets**
+  - Nginx serves PWA assets; uses aggressive caching headers
+  - Optionally integrate with an external CDN for global caching
+- **API Gateway** (optional)
+  - Nginx with JWT validation plugin for a single entry point
 
 ## 7. Security Measures
 
 - **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
-
-- **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
-
+  - JWT tokens (short-lived access, longer refresh) over HTTPS
+  - RBAC middleware checks user roles on each endpoint
+- **Data Protection**
+  - TLS encryption for all network traffic
+  - Disk encryption on database server
+  - Environment variables or vault for secrets
 - **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
-
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+  - Validate and sanitize all inputs with a library like Joi
+- **Rate Limiting & DDOS Protection**
+  - express-rate-limit to throttle requests
+- **Audit Logging**
+  - Every create/update/delete is logged with old vs. new values
+- **Vulnerability Scans**
+  - Regular dependency checks (`npm audit`)
+  - Periodic penetration tests if policy requires
 
 ## 8. Monitoring and Maintenance
 
-- **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
-
 - **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
-
-- **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
-
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+  - Winston writes structured logs to file
+  - Forward logs to a local ELK stack or Graylog
+- **Metrics & Health**
+  - Prometheus Node Exporter on each service
+  - Grafana dashboards for:
+    - CPU/memory usage
+    - Request latency & error rates
+    - Database query performance
+  - `/health` endpoint for uptime checks
+- **Alerts**
+  - Alertmanager triggers email or SMS on high error rates or service down
+- **Backups & Updates**
+  - Daily database dumps + WAL archiving
+  - Weekly restores test on a staging server
+  - CI/CD pipeline runs tests and deploys new images
+  - Scheduled maintenance windows for upgrades
 
 ## 9. Conclusion and Overall Backend Summary
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+The ISP-Care Pro backend is a modular Node.js/Express system with a PostgreSQL core, designed for small to mid-sized ISPs. It supports:
+
+- Secure, token-based login and fine-grained roles
+- Automated PPPoE management via MikroTik integration
+- Interactive, role-based maps of customer locations
+- Full support ticket lifecycle and technician dashboard
+- Financial tracking and dynamic reporting tools
+- CSV import, Telegram notifications, and payment handling via Xendit
+- On-premises deployment for maximum data control
+
+This setup delivers a scalable, maintainable, and secure foundation—ready to grow with ISP businesses while keeping daily operations smooth and data safe.
+
+---
+**Document Details**
+- **Project ID**: 5df15940-ecfb-4c61-a11c-4146dc32684e
+- **Document ID**: beae79c0-91ec-48d3-8750-0c64d69fc56d
+- **Type**: custom
+- **Custom Type**: backend_structure_document
+- **Status**: completed
+- **Generated On**: 2025-12-02T03:06:51.595Z
+- **Last Updated**: N/A
